@@ -1,0 +1,5 @@
+# Per-client-IP rate limit at the gateway (requests per second, burst).
+rate_limit_average: 50
+rate_limit_burst: 100
+# Largest JSON-RPC request body accepted, in bytes.
+max_request_bytes: 1048576

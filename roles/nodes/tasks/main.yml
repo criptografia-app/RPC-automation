@@ -1,0 +1,121 @@
+---
+# Catalog order, so counterparty always comes after bitcoin.
+- name: Resolve enabled chains
+  set_fact:
+    enabled_chains: "{{ chain_catalog | list | select('in', rpc_chains) | list }}"
+    disabled_chains: "{{ chain_catalog | list | reject('in', rpc_chains) | list }}"
+
+- name: Data directories
+  file:
+    path: "{{ rpc_data_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ enabled_chains | map('regex_replace', '^counterparty$', 'counterparty/data') | list
+            + (['counterparty/cache'] if 'counterparty' in enabled_chains else []) }}"
+
+- name: Render pod manifests
+  template:
+    src: "{{ 'counterparty' if chain == 'counterparty' else 'coin' }}.yaml.j2"
+    dest: "{{ sdme_pod_dir }}/{{ chain }}.yaml"
+    mode: "0600"
+  loop: "{{ enabled_chains }}"
+  loop_control:
+    loop_var: chain
+  register: manifests
+
+- name: Read current containers
+  command: sdme ps --json
+  register: sdme_ps
+  changed_when: false
+
+- name: Note which pods exist
+  set_fact:
+    existing_pods: "{{ sdme_ps.stdout | from_json | map(attribute='name') | list }}"
+
+# kube create never replaces, so a changed manifest means delete + create.
+# Chain data lives on the host (rpc_data_dir) and survives this.
+- name: Create or replace pods (new chain, or its manifest changed)
+  shell: |
+    set -e
+    if sdme ps --json | python3 -c 'import json,sys; sys.exit(0 if "{{ item.chain }}" in [c["name"] for c in json.load(sys.stdin)] else 1)'; then
+      sdme kube delete {{ item.chain }}
+    fi
+    sdme kube create -f {{ sdme_pod_dir }}/{{ item.chain }}.yaml --base-fs {{ sdme_base_fs }}
+  loop: "{{ manifests.results }}"
+  loop_control:
+    label: "{{ item.chain }}"
+  when: item.changed or item.chain not in existing_pods
+
+- name: Start pods and enable them at boot
+  shell: |
+    set -e
+    state=$(sdme ps --json | python3 -c 'import json,sys; print(next((c.get("status","") for c in json.load(sys.stdin) if c["name"]=="{{ item }}"), ""))')
+    [ "$state" = running ] || sdme start -t {{ sdme_boot_timeout }} {{ item }}
+    sdme enable {{ item }}
+  loop: "{{ enabled_chains }}"
+  changed_when: false
+
+- name: Remove pods for chains no longer in CHAINS (data stays in {{ rpc_data_dir }})
+  command: "sdme kube delete {{ item }}"
+  loop: "{{ disabled_chains }}"
+  when: item in existing_pods
+
+# ── Firewall ───────────────────────────────────────────────────────────────
+- name: Open P2P ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ chain_catalog[item].p2p_port | string }}"
+    proto: tcp
+    comment: "{{ item }} p2p"
+  loop: "{{ enabled_chains | reject('equalto', 'counterparty') | list }}"
+  when: firewall_enabled
+
+- name: Open node RPC to the gateway only
+  community.general.ufw:
+    rule: allow
+    port: "{{ chain_catalog[item].rpc_port | string }}"
+    proto: tcp
+    from_ip: "{{ edge_backend_ip }}"
+    comment: "{{ item }} rpc from gateway"
+  loop: "{{ enabled_chains }}"
+  when: firewall_enabled and not colocated_edge
+
+# ── Chain metrics ──────────────────────────────────────────────────────────
+- name: chain-metrics script
+  template:
+    src: chain-metrics.sh.j2
+    dest: /usr/local/bin/chain-metrics.sh
+    mode: "0700"
+
+- name: chain-metrics service and timer
+  copy:
+    dest: "/etc/systemd/system/{{ item.name }}"
+    mode: "0644"
+    content: "{{ item.content }}"
+  loop:
+    - name: chain-metrics.service
+      content: |
+        [Unit]
+        Description=Chain height and sync metrics
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/chain-metrics.sh
+    - name: chain-metrics.timer
+      content: |
+        [Unit]
+        Description=Collect chain metrics every 30s
+        [Timer]
+        OnBootSec=30s
+        OnUnitActiveSec=30s
+        [Install]
+        WantedBy=timers.target
+  loop_control:
+    label: "{{ item.name }}"
+  notify: restart chain-metrics
+
+- name: Start chain-metrics timer
+  systemd:
+    name: chain-metrics.timer
+    state: started
+    enabled: true
+    daemon_reload: true

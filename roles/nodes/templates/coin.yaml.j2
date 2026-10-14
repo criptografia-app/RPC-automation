@@ -1,0 +1,48 @@
+{% set c = chain_catalog[chain] %}
+{% set full = (chain == 'bitcoin' and bitcoin_full) or (prune_mb | int) == 0 %}
+{% set local_only = colocated_edge %}
+# Rendered by RPC-automation. Re-run ./deploy.sh instead of editing.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ chain }}
+spec:
+  hostNetwork: true
+  terminationGracePeriodSeconds: 600
+  containers:
+  - name: {{ chain }}
+    image: {{ c.image }}
+    env:
+    - name: {{ c.data_env }}
+      value: /data
+    args:
+      - "{{ c.daemon }}"
+      - "-datadir=/data"
+      - "-server=1"
+      - "-printtoconsole=1"
+      - "-prune={{ 0 if full else prune_mb }}"
+      - "-txindex={{ 1 if full else 0 }}"
+      - "-rpcport={{ c.rpc_port }}"
+      - "-rpcbind=127.0.0.1"
+      - "-rpcallowip=127.0.0.1"
+{% if not local_only %}
+      - "-rpcbind={{ backend_ip }}"
+      - "-rpcallowip={{ edge_backend_ip }}/32"
+{% endif %}
+      - "-rpcuser={{ node_rpc_user }}"
+      - "-rpcpassword={{ node_rpc_password }}"
+      - "-rpcworkqueue=64"
+      - "-rpcthreads=8"
+{% if chain == 'bitcoin' and 'counterparty' in rpc_chains %}
+      - "-zmqpubrawtx=tcp://127.0.0.1:{{ zmq_tx_port }}"
+      - "-zmqpubhashtx=tcp://127.0.0.1:{{ zmq_tx_port }}"
+      - "-zmqpubsequence=tcp://127.0.0.1:{{ zmq_tx_port }}"
+      - "-zmqpubrawblock=tcp://127.0.0.1:{{ zmq_block_port }}"
+{% endif %}
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    hostPath:
+      path: {{ rpc_data_dir }}/{{ chain }}

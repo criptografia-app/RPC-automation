@@ -1,0 +1,56 @@
+{# Clients call /<chain>/<api key>[/rest]; the key never reaches the node. #}
+{% set host = ('Host(`' ~ rpc_domain ~ '`) && ') if rpc_domain and rpc_domain != 'rpc.example.com' else '' %}
+{% set keys = api_keys | join('|') %}
+{% set tls = '{certResolver: le}' if tls_mode == 'acme' else '{}' %}
+# Rendered by RPC-automation. Re-run ./deploy.sh instead of editing.
+http:
+  routers:
+{% for chain in rpc_chains %}
+    {{ chain }}:
+      rule: "{{ host }}PathRegexp(`^/{{ chain }}/({{ keys }})(/|$)`)"
+      entryPoints: [websecure]
+      service: {{ chain }}
+      middlewares: [limits, {{ chain }}-strip{{ '' if chain == 'counterparty' else ', node-auth' }}]
+      tls: {{ tls }}
+{% endfor %}
+    grafana:
+      rule: "{{ host }}PathPrefix(`/grafana`)"
+      entryPoints: [websecure]
+      service: grafana
+      tls: {{ tls }}
+
+  middlewares:
+    limits:
+      chain:
+        middlewares: [ratelimit, bodylimit]
+    ratelimit:
+      rateLimit:
+        average: {{ rate_limit_average }}
+        burst: {{ rate_limit_burst }}
+    bodylimit:
+      buffering:
+        maxRequestBodyBytes: {{ max_request_bytes }}
+    node-auth:
+      headers:
+        customRequestHeaders:
+          Authorization: "Basic {{ (node_rpc_user ~ ':' ~ node_rpc_password) | b64encode }}"
+{% for chain in rpc_chains %}
+    {{ chain }}-strip:
+      replacePathRegex:
+        regex: "^/{{ chain }}/[^/]+/?(.*)"
+        replacement: "/$1"
+{% endfor %}
+
+  services:
+{% for chain in rpc_chains %}
+    {{ chain }}:
+      loadBalancer:
+        servers:
+{% for n in groups['nodes'] %}
+          - url: "http://{{ '127.0.0.1' if hostvars[n].colocated_edge else hostvars[n].backend_ip }}:{{ chain_catalog[chain].rpc_port }}"
+{% endfor %}
+{% endfor %}
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3001"

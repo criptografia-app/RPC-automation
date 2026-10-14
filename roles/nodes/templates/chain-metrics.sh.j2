@@ -1,0 +1,30 @@
+#!/bin/bash
+# Writes block height and sync progress for node_exporter's textfile collector.
+out=/var/lib/node_exporter/textfile
+tmp=$(mktemp "$out/.chain.XXXXXX")
+{
+  echo "# HELP chain_block_height Current block height"
+  echo "# TYPE chain_block_height gauge"
+  echo "# HELP chain_sync_progress Verification progress, 0 to 1"
+  echo "# TYPE chain_sync_progress gauge"
+  echo "# HELP chain_peers Connected peers"
+  echo "# TYPE chain_peers gauge"
+{% for chain in rpc_chains if chain != 'counterparty' %}
+  r=$(curl -s -m 5 -u '{{ node_rpc_user }}:{{ node_rpc_password }}' -H 'content-type: application/json' \
+    -d '{"jsonrpc":"1.0","id":"m","method":"getblockchaininfo","params":[]}' http://127.0.0.1:{{ chain_catalog[chain].rpc_port }}/)
+  p=$(curl -s -m 5 -u '{{ node_rpc_user }}:{{ node_rpc_password }}' -H 'content-type: application/json' \
+    -d '{"jsonrpc":"1.0","id":"m","method":"getconnectioncount","params":[]}' http://127.0.0.1:{{ chain_catalog[chain].rpc_port }}/)
+  python3 - "$r" "$p" <<'PY'
+import json, sys
+try:
+    r = json.loads(sys.argv[1])["result"]
+    print('chain_block_height{chain="{{ chain }}"} %d' % r["blocks"])
+    print('chain_sync_progress{chain="{{ chain }}"} %f' % r["verificationprogress"])
+    print('chain_peers{chain="{{ chain }}"} %d' % json.loads(sys.argv[2])["result"])
+except Exception:
+    pass
+PY
+{% endfor %}
+} > "$tmp"
+chmod 0644 "$tmp"
+mv "$tmp" "$out/chain.prom"

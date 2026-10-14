@@ -1,0 +1,21 @@
+# Rendered by RPC-automation. Re-run ./deploy.sh instead of editing.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: node
+    static_configs:
+{% for n in groups['nodes'] %}
+      - targets: ["{{ '127.0.0.1' if hostvars[n].colocated_edge else hostvars[n].backend_ip }}:9100"]
+        labels: {host: "{{ n }}"}
+{% endfor %}
+{% if inventory_hostname not in groups['nodes'] %}
+      - targets: ["127.0.0.1:9100"]
+        labels: {host: "{{ inventory_hostname }}"}
+{% endif %}
+  - job_name: traefik
+    static_configs:
+      - targets: ["127.0.0.1:8082"]
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]

@@ -1,0 +1,48 @@
+# Rendered by RPC-automation. Re-run ./deploy.sh instead of editing.
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+  internal:
+    address: "127.0.0.1:8082"
+
+ping:
+  entryPoint: internal
+
+metrics:
+  prometheus:
+    entryPoint: internal
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+{% if tls_mode == 'acme' %}
+
+certificatesResolvers:
+  le:
+    acme:
+      email: "{{ acme_email }}"
+      storage: /var/lib/traefik/acme.json
+{% if cloudflare_dns_api_token %}
+      dnsChallenge:
+        provider: cloudflare
+        resolvers: ["1.1.1.1:53", "1.0.0.1:53"]
+{% else %}
+      httpChallenge:
+        entryPoint: web
+{% endif %}
+{% endif %}
+
+log:
+  level: INFO
+# No access log on purpose: request paths contain API keys.

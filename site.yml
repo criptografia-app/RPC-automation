@@ -1,0 +1,16 @@
+---
+# Everything is driven by .env through inventory.py. Run with ./deploy.sh
+- name: Base setup (packages, sdme, firewall, metrics)
+  hosts: all
+  become: true
+  roles: [common]
+
+- name: Chain nodes
+  hosts: nodes
+  become: true
+  roles: [nodes]
+
+- name: Gateway (TLS, API keys, Prometheus, Grafana)
+  hosts: edge
+  become: true
+  roles: [edge]

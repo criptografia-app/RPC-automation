@@ -1,0 +1,83 @@
+---
+- name: Gateway directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.owner | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - {path: /etc/rpc-automation/traefik/dynamic, mode: "0700"}
+    - {path: /etc/rpc-automation/prometheus}
+    - {path: /etc/rpc-automation/grafana/datasources}
+    - {path: /etc/rpc-automation/grafana/dashboards}
+    - {path: "{{ edge_data_dir }}/traefik", mode: "0700"}
+    - {path: "{{ edge_data_dir }}/prometheus", owner: "65534"}   # prometheus image runs as nobody
+    - {path: "{{ edge_data_dir }}/grafana", owner: "472"}        # grafana image UID
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Traefik static config
+  template: {src: traefik.yml.j2, dest: /etc/rpc-automation/traefik/traefik.yml, mode: "0600"}
+  notify: restart traefik
+
+# Traefik watches this file; route and API key changes apply without a restart.
+- name: Routes, API keys and backends
+  template: {src: routes.yml.j2, dest: /etc/rpc-automation/traefik/dynamic/routes.yml, mode: "0600"}
+
+- name: Prometheus config
+  template: {src: prometheus.yml.j2, dest: /etc/rpc-automation/prometheus/prometheus.yml, mode: "0644"}
+  notify: restart prometheus
+
+- name: Grafana provisioning
+  template: {src: "{{ item.src }}", dest: "/etc/rpc-automation/grafana/{{ item.dest }}", mode: "0644"}
+  loop:
+    - {src: datasource.yaml.j2, dest: datasources/prometheus.yaml}
+    - {src: dashboards.yaml.j2, dest: dashboards/provider.yaml}
+  notify: restart grafana
+
+- name: Grafana dashboard
+  copy: {src: rpc-dashboard.json, dest: /etc/rpc-automation/grafana/dashboards/rpc-dashboard.json, mode: "0644"}
+
+- name: Render gateway pods
+  template:
+    src: "{{ item }}.pod.yaml.j2"
+    dest: "{{ sdme_pod_dir }}/{{ item }}.yaml"
+    mode: "0600"
+  loop: [traefik, prometheus, grafana]
+  register: edge_pods
+
+- name: Read current containers
+  command: sdme ps --json
+  register: edge_ps
+  changed_when: false
+
+- name: Create or replace gateway pods
+  shell: |
+    set -e
+    if {{ 'true' if item.item in (edge_ps.stdout | from_json | map(attribute='name') | list) else 'false' }}; then
+      sdme kube delete {{ item.item }}
+    fi
+    sdme kube create -f {{ sdme_pod_dir }}/{{ item.item }}.yaml --base-fs {{ sdme_base_fs }}
+  loop: "{{ edge_pods.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.changed or item.item not in (edge_ps.stdout | from_json | map(attribute='name') | list)
+
+- name: Start gateway pods and enable them at boot
+  shell: |
+    set -e
+    state=$(sdme ps --json | python3 -c 'import json,sys; print(next((c.get("status","") for c in json.load(sys.stdin) if c["name"]=="{{ item }}"), ""))')
+    [ "$state" = running ] || sdme start -t {{ sdme_boot_timeout }} {{ item }}
+    sdme enable {{ item }}
+  loop: [traefik, prometheus, grafana]
+  changed_when: false
+
+- name: Open HTTP and HTTPS
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: rpc gateway
+  loop: ["80", "443"]
+  when: firewall_enabled

@@ -1,0 +1,32 @@
+# Rendered by RPC-automation. Re-run ./deploy.sh instead of editing.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: counterparty
+spec:
+  hostNetwork: true
+  terminationGracePeriodSeconds: 300
+  containers:
+  - name: counterparty
+    image: {{ chain_catalog.counterparty.image }}
+    args:
+      - "start"
+      - "--api-host={{ '127.0.0.1' if colocated_edge else backend_ip }}"
+      - "--api-port={{ chain_catalog.counterparty.rpc_port }}"
+      - "--backend-connect=127.0.0.1"
+      - "--backend-port={{ chain_catalog.bitcoin.rpc_port }}"
+      - "--backend-user={{ node_rpc_user }}"
+      - "--backend-password={{ node_rpc_password }}"
+      - "--catch-up=bootstrap"
+    volumeMounts:
+    - name: data
+      mountPath: /root/.local/share/counterparty
+    - name: cache
+      mountPath: /root/.cache/counterparty
+  volumes:
+  - name: data
+    hostPath:
+      path: {{ rpc_data_dir }}/counterparty/data
+  - name: cache
+    hostPath:
+      path: {{ rpc_data_dir }}/counterparty/cache

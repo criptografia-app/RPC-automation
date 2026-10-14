@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: traefik
+spec:
+  hostNetwork: true
+  containers:
+  - name: traefik
+    image: {{ images.traefik }}
+    args: ["--configFile=/etc/traefik/traefik.yml"]
+{% if cloudflare_dns_api_token %}
+    env:
+    - name: CF_DNS_API_TOKEN
+      value: "{{ cloudflare_dns_api_token }}"
+{% endif %}
+    volumeMounts:
+    - {name: config, mountPath: /etc/traefik}
+    - {name: data, mountPath: /var/lib/traefik}
+  volumes:
+  - {name: config, hostPath: {path: /etc/rpc-automation/traefik}}
+  - {name: data, hostPath: {path: "{{ edge_data_dir }}/traefik"}}

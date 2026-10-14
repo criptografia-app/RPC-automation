@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grafana
+spec:
+  hostNetwork: true
+  containers:
+  - name: grafana
+    image: {{ images.grafana }}
+    env:
+    - {name: GF_SERVER_HTTP_ADDR, value: "127.0.0.1"}
+    - {name: GF_SERVER_HTTP_PORT, value: "3001"}
+    - {name: GF_SERVER_ROOT_URL, value: "%(protocol)s://%(domain)s/grafana/"}
+    - {name: GF_SERVER_SERVE_FROM_SUB_PATH, value: "true"}
+    - {name: GF_SECURITY_ADMIN_PASSWORD, value: "{{ grafana_admin_password }}"}
+    - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "false"}
+    - {name: GF_ANALYTICS_REPORTING_ENABLED, value: "false"}
+    volumeMounts:
+    - {name: data, mountPath: /var/lib/grafana}
+    - {name: provisioning, mountPath: /etc/grafana/provisioning}
+  volumes:
+  - {name: data, hostPath: {path: "{{ edge_data_dir }}/grafana"}}
+  - {name: provisioning, hostPath: {path: /etc/rpc-automation/grafana}}

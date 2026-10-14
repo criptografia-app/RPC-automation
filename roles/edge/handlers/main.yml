@@ -1,0 +1,7 @@
+---
+- name: restart traefik
+  command: sdme restart traefik
+- name: restart prometheus
+  command: sdme restart prometheus
+- name: restart grafana
+  command: sdme restart grafana

@@ -1,0 +1,40 @@
+# Internals shared by all roles. Everything you normally change is in .env.
+sdme_base_fs: ubuntu
+sdme_base_image: docker.io/ubuntu:24.04
+sdme_boot_timeout: 300
+sdme_pod_dir: /etc/rpc-automation/pods
+rpc_data_dir: /var/lib/rpc-automation
+node_exporter_version: "1.12.1"
+edge_data_dir: /var/lib/rpc-automation/edge
+images:
+  traefik: docker.io/library/traefik:v3.7.14
+  prometheus: docker.io/prom/prometheus:v3.13.4
+  grafana: docker.io/grafana/grafana:13.2.4
+
+# Pinned images: change a tag here, re-run ./deploy.sh, and only that chain is replaced.
+chain_catalog:
+  bitcoin:
+    image: docker.io/btcpayserver/bitcoin:31.1-1      # amd64, arm64
+    daemon: bitcoind
+    data_env: BITCOIN_DATA
+    rpc_port: 8332
+    p2p_port: 8333
+  litecoin:
+    image: docker.io/btcpayserver/litecoin:0.21.5.8   # amd64, arm64
+    daemon: litecoind
+    data_env: BITCOIN_DATA
+    rpc_port: 9332
+    p2p_port: 9333
+  dogecoin:
+    image: docker.io/btcpayserver/dogecoin:1.14.9-amd64   # amd64 only
+    daemon: dogecoind
+    data_env: DOGECOIN_DATA
+    rpc_port: 22555
+    p2p_port: 22556
+  counterparty:
+    image: docker.io/counterparty/counterparty:v11.5.0    # amd64 only
+    rpc_port: 4000
+
+# Bitcoin Core ZMQ for Counterparty, on loopback (the defaults 9332/9333 clash with Litecoin).
+zmq_tx_port: 28332
+zmq_block_port: 28333
