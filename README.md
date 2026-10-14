@@ -114,7 +114,7 @@ exactly what to fix.
 
 ```mermaid
 flowchart LR
-    client([Wallet · dApp · script]) -- "HTTPS<br>/bitcoin/&lt;key&gt;" --> traefik
+    client([Wallet · dApp · script]) -- "HTTPS<br>/bitcoin/API_KEY" --> traefik
     subgraph gw [Gateway]
         traefik[Traefik<br>TLS · API keys · rate limits]
         prom[Prometheus] --> graf[Grafana]
