@@ -47,6 +47,9 @@ you get production-shaped endpoints you control end to end.
 | 📈 **Monitoring** | Prometheus + Grafana, provisioned: an overview, one dashboard per chain (sync, peers, mempool, its traffic, latency, errors, its servers) and a hosts dashboard |
 | 🔁 **Day 2** | Re-run to change anything. Only what changed is replaced, chain data stays put |
 
+<p align="center"><img src="docs/grafana-overview.png" width="900" alt="Grafana overview: 2 chains answering RPC, 3.4 requests per second, 0% errors, both servers up"></p>
+<p align="center"><sub>The provisioned Grafana overview on the two test servers, mid initial sync on 2 vCPUs, which is why p95 is seconds.</sub></p>
+
 ## Hardware
 
 Run as many chains as your box can hold. Approximate figures for October 2026;
