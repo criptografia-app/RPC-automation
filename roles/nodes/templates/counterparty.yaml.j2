@@ -13,10 +13,25 @@ spec:
       - "start"
       - "--api-host={{ '127.0.0.1' if colocated_edge else backend_ip }}"
       - "--api-port={{ chain_catalog.counterparty.rpc_port }}"
+{% if xcp_backend %}
+      - "--backend-connect={{ xcp_backend.host }}"
+      - "--backend-port={{ xcp_backend.port }}"
+{% if xcp_backend.ssl %}
+      - "--backend-ssl"
+{% endif %}
+{% if xcp_backend.user %}
+      - "--backend-user={{ xcp_backend.user }}"
+{% endif %}
+{% if xcp_backend.password %}
+      - "--backend-password={{ xcp_backend.password }}"
+{% endif %}
+{% else %}
       - "--backend-connect=127.0.0.1"
       - "--backend-port={{ chain_catalog.bitcoin.rpc_port }}"
       - "--backend-user={{ node_rpc_user }}"
       - "--backend-password={{ node_rpc_password }}"
+{% endif %}
+      - "--electrs-url={{ xcp_electrs_url }}"
       - "--catch-up=bootstrap"
     volumeMounts:
     - name: data

@@ -1,6 +1,9 @@
 {% set c = chain_catalog[chain] %}
 {% set full = (chain == 'bitcoin' and bitcoin_full) or (prune_mb | int) == 0 %}
 {% set local_only = colocated_edge %}
+{# Memory: 8% of RAM for UTXO caches, split across the coins on this host; the daemons need the rest during sync. #}
+{% set coins = rpc_chains | reject('equalto', 'counterparty') | list | length %}
+{% set dbcache = [[(ansible_memtotal_mb * 0.08 / coins) | int, 2048] | min, 100] | max %}
 # Rendered by RPC-automation. Re-run ./deploy.sh instead of editing.
 apiVersion: v1
 kind: Pod
@@ -15,6 +18,8 @@ spec:
     env:
     - name: {{ c.data_env }}
       value: /data
+    - name: MALLOC_ARENA_MAX   # stops glibc from bloating RSS during sync
+      value: "2"
     args:
       - "{{ c.daemon }}"
       - "-datadir=/data"
@@ -31,9 +36,11 @@ spec:
 {% endif %}
       - "-rpcuser={{ node_rpc_user }}"
       - "-rpcpassword={{ node_rpc_password }}"
+      - "-dbcache={{ dbcache }}"
+      - "-maxmempool={{ 100 if ansible_memtotal_mb < 8192 else 300 }}"
       - "-rpcworkqueue=64"
       - "-rpcthreads=8"
-{% if chain == 'bitcoin' and 'counterparty' in rpc_chains %}
+{% if chain == 'bitcoin' and 'counterparty' in rpc_chains and not xcp_backend %}
       - "-zmqpubrawtx=tcp://127.0.0.1:{{ zmq_tx_port }}"
       - "-zmqpubhashtx=tcp://127.0.0.1:{{ zmq_tx_port }}"
       - "-zmqpubsequence=tcp://127.0.0.1:{{ zmq_tx_port }}"

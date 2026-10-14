@@ -9,6 +9,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 HERE = Path(__file__).resolve().parent
 ENV_FILE = Path(os.environ.get("RPC_ENV_FILE", HERE / ".env"))
@@ -19,7 +20,8 @@ PLACEHOLDERS = {"", "change-me", "changeme"}
 KNOWN = ("NODE_HOSTS", "NODE_PRIVATE_IPS", "EDGE_HOST", "EDGE_PRIVATE_IP", "SSH_USER", "SSH_PORT",
          "SSH_KEY", "SSH_PASSWORD", "SUDO_PASSWORD", "CHAINS", "PRUNE_MB", "NODE_RPC_USER",
          "NODE_RPC_PASSWORD", "RPC_DOMAIN", "ACME_EMAIL", "TLS_MODE", "CLOUDFLARE_DNS_API_TOKEN",
-         "API_KEYS", "GRAFANA_ADMIN_PASSWORD", "FIREWALL", "FORCE_IPV4")
+         "API_KEYS", "GRAFANA_ADMIN_PASSWORD", "FIREWALL", "FORCE_IPV4", "XCP_BITCOIN_RPC",
+         "XCP_BITCOIN_RPC_USER", "XCP_BITCOIN_RPC_PASSWORD", "XCP_ELECTRS_URL")
 
 
 def load_env():
@@ -90,9 +92,20 @@ def build(env):
         # Same machine as the gateway: RPC never leaves loopback.
         hostvars[name]["colocated_edge"] = name == edge_name
 
-    full_bitcoin = "counterparty" in chains
+    xcp_rpc = env.get("XCP_BITCOIN_RPC", "").strip()
+    xcp_backend = None
+    if xcp_rpc:
+        u = urlparse(xcp_rpc)
+        xcp_backend = {"host": u.hostname, "port": u.port or (443 if u.scheme == "https" else 8332),
+                       "ssl": u.scheme == "https", "path": u.path.strip("/"),
+                       "user": env.get("XCP_BITCOIN_RPC_USER", ""),
+                       "password": env.get("XCP_BITCOIN_RPC_PASSWORD", "")}
+    # A local full node is only needed when Counterparty uses the local bitcoin.
+    full_bitcoin = "counterparty" in chains and not xcp_backend
     shared = {
         "rpc_chains": chains,
+        "xcp_backend": xcp_backend,
+        "xcp_electrs_url": env.get("XCP_ELECTRS_URL") or "https://mempool.space/api",
         "prune_mb": int(env.get("PRUNE_MB") or 0),
         "bitcoin_full": full_bitcoin,
         "node_rpc_user": env.get("NODE_RPC_USER") or "rpc",
@@ -132,8 +145,16 @@ def problems(env):
     bad = [c for c in chains if c not in CHAINS]
     if bad or not chains:
         out.append("CHAINS: unknown %s. Use any of %s." % (", ".join(bad) or "(empty)", ", ".join(CHAINS)))
-    if "counterparty" in chains and "bitcoin" not in chains:
-        out.append("CHAINS: counterparty needs bitcoin in the list too.")
+    xcp_rpc = env.get("XCP_BITCOIN_RPC", "").strip()
+    if "counterparty" in chains and "bitcoin" not in chains and not xcp_rpc:
+        out.append("CHAINS: counterparty needs bitcoin in the list, or an external XCP_BITCOIN_RPC.")
+    if xcp_rpc:
+        u = urlparse(xcp_rpc)
+        if u.scheme not in ("http", "https") or not u.hostname:
+            out.append("XCP_BITCOIN_RPC: a full URL like https://bitcoin-rpc.publicnode.com")
+        elif u.path.strip("/"):
+            out.append("XCP_BITCOIN_RPC: Counterparty can't send a URL path (token-in-path endpoints "
+                       "need a small rewrite proxy); use host[:port] only.")
     try:
         prune = int(env.get("PRUNE_MB") or 0)
         if 0 < prune < 550:

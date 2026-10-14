@@ -44,7 +44,7 @@ you get production-shaped endpoints you control end to end.
 | 🔐 **Gateway** | Traefik with Let's Encrypt, API keys, per-IP rate limits, request size limits |
 | 🧱 **Isolation** | Each chain runs in its own systemd-nspawn container via sdme, with data on the host |
 | 🛡️ **Firewall** | ufw: deny by default; SSH, P2P and 80/443 open; node RPC reachable from the gateway only |
-| 📈 **Monitoring** | Prometheus + Grafana with a ready dashboard: block height, sync progress, peers, requests, CPU, RAM, disk |
+| 📈 **Monitoring** | Prometheus + Grafana, provisioned: an overview, one dashboard per chain (sync, peers, mempool, its traffic, latency, errors, its servers) and a hosts dashboard |
 | 🔁 **Day 2** | Re-run to change anything. Only what changed is replaced, chain data stays put |
 
 ## Hardware
@@ -57,7 +57,7 @@ chains grow every day, so leave headroom.
 | Bitcoin | ~15 GB | ~800 GB SSD | 4 GB+ | amd64, arm64 |
 | Litecoin | ~10 GB | ~200 GB SSD | 2 GB+ | amd64, arm64 |
 | Dogecoin | ~10 GB | ~200 GB SSD | 4 GB+ | amd64 |
-| Counterparty | needs full Bitcoin | ~900 GB SSD total with Bitcoin | 8 GB+ | amd64 |
+| Counterparty | ~40 GB with an [external Bitcoin RPC](#counterparty) | ~900 GB SSD with a local full Bitcoin node | 4 GB+ | amd64 |
 
 A single 4-core / 16 GB VPS with a 1 TB NVMe disk runs all four. Pruned nodes
 serve current state and new blocks, not historical blocks; choose full nodes if
@@ -88,6 +88,41 @@ curl -s https://rpc.example.com/bitcoin/$API_KEY \
 
 Grafana is at `https://rpc.example.com/grafana/` (user `admin`).
 
+## Counterparty
+
+Counterparty indexes Bitcoin, so it needs a full Bitcoin node behind it. You
+have two options:
+
+**1. Local full node.** Put both in `CHAINS=bitcoin,counterparty`. Bitcoin is
+then forced unpruned with `txindex`, and wired to Counterparty over ZMQ on
+loopback. Fastest and fully self-hosted, but about 900 GB of SSD.
+
+**2. External Bitcoin RPC, no local Bitcoin node.** Point Counterparty at any
+Bitcoin Core RPC and skip about 800 GB of disk:
+
+```sh
+CHAINS=counterparty
+XCP_BITCOIN_RPC=https://bitcoin-rpc.publicnode.com   # free, no signup
+XCP_ELECTRS_URL=https://mempool.space/api            # UTXO lookups
+```
+
+Public endpoints have no ZMQ, so Counterparty follows new blocks by polling
+every few seconds and doesn't see unconfirmed transactions. Public endpoints
+also rate-limit; for production, use a Bitcoin node you control (for example
+one deployed by this repo on another server) via `XCP_BITCOIN_RPC` plus
+`XCP_BITCOIN_RPC_USER`/`XCP_BITCOIN_RPC_PASSWORD`.
+
+**Fast first sync.** Either way, Counterparty starts from the official
+bootstrap snapshot instead of parsing every block since 2014
+(`--catch-up=bootstrap`). It downloads the snapshot that matches its version
+and verifies the GPG signature against Counterparty's release keys before
+using it. The current mainnet files:
+
+| File | Size |
+|---|---|
+| [`counterparty.db.v11.4.0.zst`](https://storage.googleapis.com/counterparty-bootstrap/counterparty.db.v11.4.0.zst) · [`.sig`](https://storage.googleapis.com/counterparty-bootstrap/counterparty.db.v11.4.0.sig) | 5.2 GB |
+| [`state.db.v11.4.0.zst`](https://storage.googleapis.com/counterparty-bootstrap/state.db.v11.4.0.zst) · [`.sig`](https://storage.googleapis.com/counterparty-bootstrap/state.db.v11.4.0.sig) | 2.3 GB |
+
 ## Everything lives in `.env`
 
 [`.env.example`](.env.example) is the whole configuration, commented. The
@@ -101,6 +136,7 @@ there are no inventory files or YAML to edit.
 | `NODE_PRIVATE_IPS` / `EDGE_PRIVATE_IP` | Private or VPN IPs, so gateway-to-node traffic stays off the public internet |
 | `SSH_USER`, `SSH_KEY`, `SSH_PORT` | How Ansible reaches the servers (`SSH_PASSWORD`/`SUDO_PASSWORD` if you must) |
 | `CHAINS` | `bitcoin,litecoin,dogecoin,counterparty`, any subset |
+| `XCP_BITCOIN_RPC`, `XCP_ELECTRS_URL` | Run Counterparty against an external Bitcoin RPC instead of a local full node |
 | `PRUNE_MB` | Block storage per chain; `0` for full nodes |
 | `RPC_DOMAIN`, `ACME_EMAIL`, `TLS_MODE` | HTTPS via Let's Encrypt, or self-signed for testing |
 | `CLOUDFLARE_DNS_API_TOKEN` | Optional DNS challenge instead of port 80 |
@@ -166,7 +202,8 @@ Every release is deployed for real, not just syntax-checked:
 | Single server (node + gateway), Ubuntu 24.04, Bitcoin + Litecoin | deploys, `./deploy.sh test` passes, second run changes nothing |
 | Two servers (node + separate gateway over a private network) | deploys, gateway reaches the node over the private IP, node RPC unreachable from anywhere else |
 | Wrong API key | 404, never reaches a node |
-| Grafana | dashboard provisioned, metrics from every server |
+| Grafana | every panel query checked against live Prometheus (83/83 return data) |
+| Memory | a 4 GB server syncing Bitcoin and Litecoin together ran out of memory; caches are now sized from RAM |
 
 Those runs were on arm64 VMs. The Dogecoin and Counterparty images are
 amd64-only, so they run on typical x86 servers but weren't part of that run.
