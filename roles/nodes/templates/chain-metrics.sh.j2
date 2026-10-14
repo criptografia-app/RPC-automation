@@ -3,8 +3,9 @@
 out=/var/lib/node_exporter/textfile
 tmp=$(mktemp "$out/.chain.XXXXXX")
 
+# Nodes in initial sync can hold their lock for seconds; slow is not down.
 rpc() {  # rpc <port> <method>
-  curl -s -m 5 -u '{{ node_rpc_user }}:{{ node_rpc_password }}' -H 'content-type: application/json' \
+  curl -s -m 20 -u '{{ node_rpc_user }}:{{ node_rpc_password }}' -H 'content-type: application/json' \
     -d "{\"jsonrpc\":\"1.0\",\"id\":\"m\",\"method\":\"$2\",\"params\":[]}" "http://127.0.0.1:$1/"
 }
 
@@ -26,15 +27,18 @@ rpc() {  # rpc <port> <method>
 # TYPE chain_mempool_bytes gauge
 # HELP chain_size_on_disk_bytes Block and undo data on disk
 # TYPE chain_size_on_disk_bytes gauge
+# HELP chain_rpc_seconds Time getblockchaininfo took to answer
+# TYPE chain_rpc_seconds gauge
 # HELP chain_pruned 1 if the node is pruned
 # TYPE chain_pruned gauge
 HELP
 {% for chain in rpc_chains if chain != 'counterparty' %}
-  python3 - '{{ chain }}' "$(rpc {{ chain_catalog[chain].rpc_port }} getblockchaininfo)" \
+  t0=$(date +%s.%N); info=$(rpc {{ chain_catalog[chain].rpc_port }} getblockchaininfo); t1=$(date +%s.%N)
+  python3 - '{{ chain }}' "$info" \
     "$(rpc {{ chain_catalog[chain].rpc_port }} getconnectioncount)" \
-    "$(rpc {{ chain_catalog[chain].rpc_port }} getmempoolinfo)" <<'PY'
+    "$(rpc {{ chain_catalog[chain].rpc_port }} getmempoolinfo)" "$t0" "$t1" <<'PY'
 import json, sys
-chain, info, peers, mempool = sys.argv[1:5]
+chain, info, peers, mempool, t0, t1 = sys.argv[1:7]
 label = '{chain="%s"}' % chain
 def result(raw):
     try:
@@ -48,6 +52,7 @@ if i:
     print("chain_headers%s %d" % (label, i.get("headers", 0)))
     print("chain_sync_progress%s %f" % (label, i.get("verificationprogress", 0)))
     print("chain_pruned%s %d" % (label, 1 if i.get("pruned") else 0))
+    print("chain_rpc_seconds%s %.3f" % (label, float(t1) - float(t0)))
     if "size_on_disk" in i:
         print("chain_size_on_disk_bytes%s %d" % (label, i["size_on_disk"]))
 if p is not None:

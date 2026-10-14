@@ -138,8 +138,13 @@ def chain_board(chain):
         b.row("Status")
         b.add("stat", "RPC up", [(f"min(chain_rpc_up{{{c}}})", "")], w=3, h=4, thresholds=RED,
               unit="bool_yes_no")
-        b.add("stat", "Height", [(f"max(chain_block_height{{{c}}})", "")], w=4, h=4, unit="none")
-        b.add("stat", "Headers", [(f"max(chain_headers{{{c}}})", "")], w=4, h=4, unit="none")
+        b.add("stat", "RPC response", [(f"max(chain_rpc_seconds{{{c}}})", "")], w=3, h=4, unit="s",
+              desc="How long the node took to answer getblockchaininfo. Seconds are normal during initial sync.",
+              thresholds={"mode": "absolute", "steps": [{"color": "green", "value": None},
+                                                         {"color": "orange", "value": 1},
+                                                         {"color": "red", "value": 10}]})
+        b.add("stat", "Height", [(f"max(chain_block_height{{{c}}})", "")], w=3, h=4, unit="none")
+        b.add("stat", "Headers", [(f"max(chain_headers{{{c}}})", "")], w=3, h=4, unit="none")
         b.add("stat", "Synced", [(f"min(chain_sync_progress{{{c}}})", "")], w=3, h=4, unit="percentunit",
               thresholds={"mode": "absolute", "steps": [{"color": "orange", "value": None},
                                                          {"color": "green", "value": 0.9999}]})
@@ -148,7 +153,7 @@ def chain_board(chain):
                                                          {"color": "orange", "value": 1},
                                                          {"color": "green", "value": 4}]})
         b.add("stat", "Mempool", [(f"sum(chain_mempool_tx{{{c}}})", "")], w=3, h=4, unit="none")
-        b.add("stat", "On disk", [(f"max(chain_size_on_disk_bytes{{{c}}})", "")], w=4, h=4, unit="bytes")
+        b.add("stat", "On disk", [(f"max(chain_size_on_disk_bytes{{{c}}})", "")], w=3, h=4, unit="bytes")
         b.row("Sync")
         b.add("timeseries", "Block height vs headers", [
             (f"chain_block_height{{{c}}}", "blocks {{host}}"),

@@ -83,7 +83,7 @@
   {
    "id": 3,
    "type": "stat",
-   "title": "Height",
+   "title": "RPC response",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
@@ -91,7 +91,67 @@
    "gridPos": {
     "x": 3,
     "y": 1,
-    "w": 4,
+    "w": 3,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max(chain_rpc_seconds{chain=\"dogecoin\"})",
+     "legendFormat": "",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 10
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "area",
+    "textMode": "value"
+   },
+   "description": "How long the node took to answer getblockchaininfo. Seconds are normal during initial sync."
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Height",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 1,
+    "w": 3,
     "h": 4
    },
    "targets": [
@@ -132,7 +192,7 @@
    }
   },
   {
-   "id": 4,
+   "id": 5,
    "type": "stat",
    "title": "Headers",
    "datasource": {
@@ -140,9 +200,9 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 7,
+    "x": 9,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
@@ -183,7 +243,7 @@
    }
   },
   {
-   "id": 5,
+   "id": 6,
    "type": "stat",
    "title": "Synced",
    "datasource": {
@@ -191,7 +251,7 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 11,
+    "x": 12,
     "y": 1,
     "w": 3,
     "h": 4
@@ -238,7 +298,7 @@
    }
   },
   {
-   "id": 6,
+   "id": 7,
    "type": "stat",
    "title": "Peers",
    "datasource": {
@@ -246,7 +306,7 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 14,
+    "x": 15,
     "y": 1,
     "w": 3,
     "h": 4
@@ -297,7 +357,7 @@
    }
   },
   {
-   "id": 7,
+   "id": 8,
    "type": "stat",
    "title": "Mempool",
    "datasource": {
@@ -305,7 +365,7 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 17,
+    "x": 18,
     "y": 1,
     "w": 3,
     "h": 4
@@ -348,7 +408,7 @@
    }
   },
   {
-   "id": 8,
+   "id": 9,
    "type": "stat",
    "title": "On disk",
    "datasource": {
@@ -356,9 +416,9 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 20,
+    "x": 21,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
@@ -399,7 +459,7 @@
    }
   },
   {
-   "id": 9,
+   "id": 10,
    "type": "row",
    "title": "Sync",
    "collapsed": false,
@@ -412,7 +472,7 @@
    "panels": []
   },
   {
-   "id": 10,
+   "id": 11,
    "type": "timeseries",
    "title": "Block height vs headers",
    "datasource": {
@@ -472,7 +532,7 @@
    }
   },
   {
-   "id": 11,
+   "id": 12,
    "type": "timeseries",
    "title": "Sync progress",
    "datasource": {
@@ -523,7 +583,7 @@
    }
   },
   {
-   "id": 12,
+   "id": 13,
    "type": "timeseries",
    "title": "Blocks behind",
    "datasource": {
@@ -575,7 +635,7 @@
    "description": "0 when in sync."
   },
   {
-   "id": 13,
+   "id": 14,
    "type": "timeseries",
    "title": "Blocks validated per hour",
    "datasource": {
@@ -626,7 +686,7 @@
    }
   },
   {
-   "id": 14,
+   "id": 15,
    "type": "row",
    "title": "Network and mempool",
    "collapsed": false,
@@ -639,7 +699,7 @@
    "panels": []
   },
   {
-   "id": 15,
+   "id": 16,
    "type": "timeseries",
    "title": "Peers",
    "datasource": {
@@ -690,7 +750,7 @@
    }
   },
   {
-   "id": 16,
+   "id": 17,
    "type": "timeseries",
    "title": "Mempool transactions",
    "datasource": {
@@ -741,7 +801,7 @@
    }
   },
   {
-   "id": 17,
+   "id": 18,
    "type": "timeseries",
    "title": "Mempool size",
    "datasource": {
@@ -792,7 +852,7 @@
    }
   },
   {
-   "id": 18,
+   "id": 19,
    "type": "row",
    "title": "Gateway: /dogecoin/",
    "collapsed": false,
@@ -805,7 +865,7 @@
    "panels": []
   },
   {
-   "id": 19,
+   "id": 20,
    "type": "stat",
    "title": "Requests / s",
    "datasource": {
@@ -856,7 +916,7 @@
    }
   },
   {
-   "id": 20,
+   "id": 21,
    "type": "stat",
    "title": "p95 latency",
    "datasource": {
@@ -907,7 +967,7 @@
    }
   },
   {
-   "id": 21,
+   "id": 22,
    "type": "stat",
    "title": "Error rate (5xx)",
    "datasource": {
@@ -966,7 +1026,7 @@
    }
   },
   {
-   "id": 22,
+   "id": 23,
    "type": "stat",
    "title": "Requests (24h)",
    "datasource": {
@@ -1017,7 +1077,7 @@
    }
   },
   {
-   "id": 23,
+   "id": 24,
    "type": "timeseries",
    "title": "Requests per second by status",
    "datasource": {
@@ -1068,7 +1128,7 @@
    }
   },
   {
-   "id": 24,
+   "id": 25,
    "type": "timeseries",
    "title": "Latency",
    "datasource": {
@@ -1137,7 +1197,7 @@
    }
   },
   {
-   "id": 25,
+   "id": 26,
    "type": "timeseries",
    "title": "Rate-limited (429) and backend errors (5xx)",
    "datasource": {
@@ -1197,7 +1257,7 @@
    }
   },
   {
-   "id": 26,
+   "id": 27,
    "type": "timeseries",
    "title": "Bandwidth",
    "datasource": {
@@ -1257,7 +1317,7 @@
    }
   },
   {
-   "id": 27,
+   "id": 28,
    "type": "row",
    "title": "Servers running dogecoin",
    "collapsed": false,
@@ -1270,7 +1330,7 @@
    "panels": []
   },
   {
-   "id": 28,
+   "id": 29,
    "type": "timeseries",
    "title": "CPU busy",
    "datasource": {
@@ -1321,7 +1381,7 @@
    }
   },
   {
-   "id": 29,
+   "id": 30,
    "type": "timeseries",
    "title": "Memory used",
    "datasource": {
@@ -1372,7 +1432,7 @@
    }
   },
   {
-   "id": 30,
+   "id": 31,
    "type": "timeseries",
    "title": "Disk used (/)",
    "datasource": {

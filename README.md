@@ -59,7 +59,9 @@ chains grow every day, so leave headroom.
 | Dogecoin | ~10 GB | ~200 GB SSD | 4 GB+ | amd64 |
 | Counterparty | ~40 GB with an [external Bitcoin RPC](#counterparty) | ~900 GB SSD with a local full Bitcoin node | 4 GB+ | amd64 |
 
-A single 4-core / 16 GB VPS with a 1 TB NVMe disk runs all four. Pruned nodes
+A single 4-core / 16 GB VPS with a 1 TB NVMe disk runs all four. Initial sync
+takes hours to days and uses every core it gets; until it finishes, RPC calls
+can take seconds. That's normal, and the dashboards show it as slow, not down. Pruned nodes
 serve current state and new blocks, not historical blocks; choose full nodes if
 you need `getblock` for old heights or `txindex` lookups.
 
@@ -203,7 +205,8 @@ Every release is deployed for real, not just syntax-checked:
 | Two servers (node + separate gateway over a private network) | deploys, gateway reaches the node over the private IP, node RPC unreachable from anywhere else |
 | Wrong API key | 404, never reaches a node |
 | Grafana | every panel query checked against live Prometheus (83/83 return data) |
-| Memory | a 4 GB server syncing Bitcoin and Litecoin together ran out of memory; caches are now sized from RAM |
+| Memory | a 4 GB server syncing Bitcoin and Litecoin together ran out of memory; caches are now sized from RAM, no kills since |
+| Small CPU | on 2 vCPUs during initial sync, Litecoin took up to 8 s per RPC call; metrics now wait 20 s and report response time |
 
 Those runs were on arm64 VMs. The Dogecoin and Counterparty images are
 amd64-only, so they run on typical x86 servers but weren't part of that run.
